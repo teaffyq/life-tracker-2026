@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tiffany & Nic's Life Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#F5F2EC;--surface:#FDFAF5;--border:#D8D2C4;--text:#1C1A16;--muted:#7A7568;
+  --work:#C44B2B;--work-bg:#FBF0EC;--work-bd:#E8C0B2;
+  --masters:#4A46A8;--masters-bg:#EEEDF9;--masters-bd:#C4C2E8;
+  --reno:#A06B10;--reno-bg:#FBF3E3;--reno-bd:#E8D4A0;
+  --wedding:#B03070;--wedding-bg:#F9EBF3;--wedding-bd:#E8B8D4;
+  --nic:#1A7A6E;--nic-bg:#E6F4F2;--nic-bd:#8FCEC9;
+  --green:#2E7D32;--green-bg:#E8F5E9;--green-bd:#A5D6A7;
+  --tiff:#B03070;--tiff-bg:#F9EBF3;--tiff-bd:#E8B8D4;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Mono',monospace;background:var(--bg);color:var(--text);min-height:100vh;padding:1.5rem;}
+h1{font-family:'Fraunces',serif;font-size:1.8rem;font-weight:300;letter-spacing:-.02em;margin-bottom:.15rem;}
+header p{font-size:11px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:1.25rem;}
+
+/* WHO AM I */
+.who-bar{display:flex;align-items:center;gap:8px;margin-bottom:1.25rem;flex-wrap:wrap;}
+.who-label{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);}
+.who-btn{font-family:'DM Mono',monospace;font-size:11px;padding:5px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:all .15s;letter-spacing:.04em;}
+.who-btn.active-tiff{background:var(--tiff-bg);border-color:var(--tiff-bd);color:var(--tiff);font-weight:500;}
+.who-btn.active-nic{background:var(--nic-bg);border-color:var(--nic-bd);color:var(--nic);font-weight:500;}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0;transition:background .3s;margin-left:auto;}
+.sync-dot.live{background:#4CAF50;}
+.sync-dot.error{background:var(--work);}
+.sync-dot.loading{background:#E8CC80;animation:pulse 1s infinite;}
+.sync-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.sgt-badge{font-size:9px;background:var(--masters-bg);color:var(--masters);border:1px solid var(--masters-bd);border-radius:10px;padding:2px 8px;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+/* READONLY BANNER */
+.readonly-banner{background:var(--reno-bg);border:1px solid var(--reno-bd);border-radius:8px;padding:8px 14px;font-size:11px;color:var(--reno);margin-bottom:1rem;display:none;}
+
+.tabs{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px;width:fit-content;margin-bottom:1.25rem;}
+.tab{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:6px 14px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-radius:5px;transition:all .15s;}
+.tab.active{background:var(--text);color:var(--bg);}
+
+.toolbar{display:flex;align-items:center;gap:8px;margin-bottom:1.25rem;flex-wrap:wrap;}
+.export-btn{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.04em;text-transform:uppercase;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 12px;cursor:pointer;color:var(--text);transition:background .15s;}
+.export-btn:hover{background:var(--border);}
+
+/* ADD FORM */
+.add-form{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem;margin-bottom:1.25rem;transition:opacity .2s;}
+.add-form.locked{opacity:.45;pointer-events:none;}
+.add-form-grid{display:grid;grid-template-columns:1fr 130px 140px 120px 90px;gap:8px;align-items:end;}
+.fg{display:flex;flex-direction:column;gap:4px;}
+.fg label{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);}
+input[type=text],input[type=date],select{font-family:'DM Mono',monospace;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 9px;color:var(--text);outline:none;width:100%;}
+input:focus,select:focus{border-color:var(--text);}
+.add-btn{font-family:'DM Mono',monospace;font-size:11px;text-transform:uppercase;background:var(--text);color:var(--bg);border:none;border-radius:6px;padding:0 14px;cursor:pointer;height:34px;white-space:nowrap;}
+.add-btn:hover{opacity:.8;}
+.add-btn:disabled{opacity:.4;cursor:not-allowed;}
+.lane-note{font-size:10px;color:var(--muted);margin-top:6px;}
+
+/* EFFORT */
+.effort-badge{font-size:9px;padding:2px 6px;border-radius:10px;border:1px solid var(--border);color:var(--muted);white-space:nowrap;}
+.effort-low{background:#EDF7EE;border-color:#A8D5AC;color:#2E6B33;}
+.effort-med{background:#FFF8E6;border-color:#E8CC80;color:#7A5500;}
+.effort-high{background:#FBF0EC;border-color:#E8C0B2;color:#8B2A0F;}
+
+/* OWNER BADGE */
+.owner-badge{font-size:9px;padding:2px 6px;border-radius:10px;white-space:nowrap;}
+.owner-tiff{background:var(--tiff-bg);color:var(--tiff);border:1px solid var(--tiff-bd);}
+.owner-nic{background:var(--nic-bg);color:var(--nic);border:1px solid var(--nic-bd);}
+.owner-both{background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd);}
+
+/* LANE PROGRESS */
+.lane-progress{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:1.25rem;}
+.lp-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+.lp-card.locked-card{opacity:.5;}
+.lp-title{font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+.lp-bar{height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:5px;}
+.lp-fill{height:100%;border-radius:3px;transition:width .4s;}
+.lp-label{font-size:10px;color:var(--muted);}
+.lp-hrs{font-size:9px;color:var(--muted);margin-top:3px;}
+.lp-lock{font-size:9px;color:var(--muted);margin-top:3px;}
+
+/* WEEK */
+.week-nav{display:flex;align-items:center;gap:10px;margin-bottom:1rem;}
+.week-nav button{font-family:'DM Mono',monospace;font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 12px;cursor:pointer;color:var(--text);}
+.week-nav button:hover{background:var(--border);}
+.week-label-main{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);}
+.week-effort-total{font-size:11px;color:var(--muted);margin-left:auto;}
+.week-summary{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;}
+.lane-pill{font-size:10px;padding:3px 10px;border-radius:20px;letter-spacing:.04em;font-weight:500;border:1px solid;}
+.pill-work{background:var(--work-bg);color:var(--work);border-color:var(--work-bd);}
+.pill-masters{background:var(--masters-bg);color:var(--masters);border-color:var(--masters-bd);}
+.pill-reno{background:var(--reno-bg);color:var(--reno);border-color:var(--reno-bd);}
+.pill-wedding{background:var(--wedding-bg);color:var(--wedding);border-color:var(--wedding-bd);}
+.pill-nic{background:var(--nic-bg);color:var(--nic);border-color:var(--nic-bd);}
+.overdue-banner{background:var(--work-bg);border:1px solid var(--work-bd);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--work);margin-bottom:1rem;}
+
+/* TASK CARD */
+.task-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:6px;display:flex;align-items:flex-start;gap:10px;position:relative;overflow:hidden;}
+.task-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
+.task-card.work::before{background:var(--work);}
+.task-card.masters::before{background:var(--masters);}
+.task-card.reno::before{background:var(--reno);}
+.task-card.wedding::before{background:var(--wedding);}
+.task-card.nic::before{background:var(--nic);}
+.task-card.done{opacity:.4;}
+.task-card.readonly-card{opacity:.75;}
+.task-check{width:17px;height:17px;border:1.5px solid var(--border);border-radius:4px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:1px;}
+.task-check.disabled-check{cursor:not-allowed;opacity:.4;}
+.task-check:not(.disabled-check):hover{border-color:var(--text);}
+.task-check.checked{background:var(--text);border-color:var(--text);}
+.task-check.checked::after{content:'✓';font-size:10px;color:var(--bg);}
+.task-body{flex:1;min-width:0;}
+.task-text{font-size:12px;color:var(--text);line-height:1.4;}
+.done .task-text{text-decoration:line-through;color:var(--muted);}
+.task-meta{display:flex;gap:6px;margin-top:4px;align-items:center;flex-wrap:wrap;}
+.task-lane-tag{font-size:9px;text-transform:uppercase;letter-spacing:.07em;font-weight:500;padding:2px 7px;border-radius:10px;}
+.tag-work{background:var(--work-bg);color:var(--work);}
+.tag-masters{background:var(--masters-bg);color:var(--masters);}
+.tag-reno{background:var(--reno-bg);color:var(--reno);}
+.tag-wedding{background:var(--wedding-bg);color:var(--wedding);}
+.tag-nic{background:var(--nic-bg);color:var(--nic);}
+.task-date{font-size:10px;color:var(--muted);}
+.task-overdue{color:var(--work)!important;font-weight:500;}
+.task-del{font-size:11px;color:var(--muted);cursor:pointer;background:none;border:none;padding:4px;opacity:0;transition:opacity .15s;flex-shrink:0;}
+.task-edit{font-size:11px;color:var(--muted);cursor:pointer;background:none;border:none;padding:4px;opacity:0;transition:opacity .15s;flex-shrink:0;}
+.task-card:hover .task-del:not(.hidden){opacity:1;}
+.task-card:hover .task-edit:not(.hidden){opacity:1;}
+.task-del:hover{color:var(--work);}
+.task-edit:hover{color:var(--masters);}
+.task-del.hidden{pointer-events:none;visibility:hidden;}
+.task-edit.hidden{pointer-events:none;visibility:hidden;}
+
+/* EDIT MODAL */
+.edit-modal-overlay{display:none;position:fixed;inset:0;background:rgba(28,26,22,.5);z-index:200;align-items:center;justify-content:center;}
+.edit-modal-overlay.open{display:flex;}
+.edit-modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem;max-width:420px;width:90%;}
+.edit-modal h3{font-family:'Fraunces',serif;font-size:1.1rem;font-weight:300;margin-bottom:1rem;}
+.edit-form-grid{display:flex;flex-direction:column;gap:10px;}
+.edit-actions{display:flex;gap:8px;margin-top:1rem;justify-content:flex-end;}
+.save-btn{font-family:'DM Mono',monospace;font-size:11px;text-transform:uppercase;background:var(--text);color:var(--bg);border:none;border-radius:6px;padding:7px 16px;cursor:pointer;}
+.save-btn:hover{opacity:.8;}
+.cancel-btn{font-family:'DM Mono',monospace;font-size:11px;text-transform:uppercase;background:var(--surface);color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:7px 16px;cursor:pointer;}
+.cancel-btn:hover{background:var(--border);}
+
+/* LANE COLUMNS */
+.lane-columns{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;}
+.lane-col{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem;}
+.lane-col.readonly-col{opacity:.8;border-style:dashed;}
+.lane-col-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;padding-bottom:.75rem;border-bottom:1px solid var(--border);}
+.lane-col-title{font-family:'Fraunces',serif;font-size:1rem;font-weight:600;font-style:italic;}
+.lane-count{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
+.empty-state{font-size:11px;color:var(--muted);padding:1rem 0;text-align:center;}
+.section-label{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:1rem 0 .5rem;}
+
+/* CALENDAR */
+.cal-nav{display:flex;align-items:center;gap:10px;margin-bottom:1rem;}
+.cal-nav button{font-family:'DM Mono',monospace;font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 12px;cursor:pointer;color:var(--text);}
+.cal-nav button:hover{background:var(--border);}
+.cal-month-label{font-size:13px;letter-spacing:.04em;color:var(--text);}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+.cal-dow{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);text-align:center;padding:4px 0;}
+.cal-day{background:var(--surface);border:1px solid var(--border);border-radius:8px;min-height:86px;padding:6px;cursor:pointer;transition:border-color .15s;}
+.cal-day:hover{border-color:var(--muted);}
+.cal-day.other-month{opacity:.3;}
+.cal-day.today{border-color:var(--text);border-width:2px;}
+.cal-day-num{font-size:10px;color:var(--muted);margin-bottom:4px;}
+.cal-day.today .cal-day-num{color:var(--text);font-weight:600;}
+.cal-dot{font-size:9px;padding:2px 5px;border-radius:4px;margin-bottom:2px;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.dot-work{background:var(--work-bg);color:var(--work);}
+.dot-masters{background:var(--masters-bg);color:var(--masters);}
+.dot-reno{background:var(--reno-bg);color:var(--reno);}
+.dot-wedding{background:var(--wedding-bg);color:var(--wedding);}
+.dot-nic{background:var(--nic-bg);color:var(--nic);}
+.dot-done{opacity:.4;text-decoration:line-through;}
+.cal-more{font-size:9px;color:var(--muted);margin-top:2px;}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(28,26,22,.5);z-index:100;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem;max-width:440px;width:90%;max-height:82vh;overflow-y:auto;}
+.modal-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem;}
+.modal-date{font-family:'Fraunces',serif;font-size:1.2rem;font-weight:300;}
+.modal-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);}
+.modal-gcal-btn{font-family:'DM Mono',monospace;font-size:10px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd);border-radius:6px;padding:4px 10px;cursor:pointer;margin-bottom:.75rem;display:inline-flex;align-items:center;gap:5px;}
+.modal-gcal-btn:hover{background:#C8E6C9;}
+
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--text);color:var(--bg);font-size:11px;padding:10px 16px;border-radius:8px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;}
+.toast.show{opacity:1;}
+
+@media(max-width:750px){
+  .add-form-grid{grid-template-columns:1fr 1fr;}
+  .lane-progress{grid-template-columns:repeat(2,1fr);}
+  .lane-columns{grid-template-columns:1fr;}
+  .cal-dot{display:none;}
+  .cal-day{min-height:48px;}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Tiffany & Nic's Life Tracker</h1>
+  <p>Jun 2026 — Jan 2027 · Wedding · Renovation · Work · Masters · Nic</p>
+</header>
+
+<!-- WHO AM I -->
+<div class="who-bar">
+  <span class="who-label">I am:</span>
+  <button class="who-btn" id="btn-tiff" onclick="setUser('tiff')">💍 Tiffany</button>
+  <button class="who-btn" id="btn-nic" onclick="setUser('nic')">👔 Nic</button>
+  <div class="sync-dot loading" id="sync-dot"></div>
+  <span class="sync-label" id="sync-label">Connecting…</span>
+  <span class="sgt-badge">🕐 SGT</span>
+</div>
+
+<div class="readonly-banner" id="readonly-banner"></div>
+
+<!-- ADD FORM -->
+<div class="add-form" id="add-form">
+  <div class="add-form-grid">
+    <div class="fg" style="grid-column:1/-1"><label>Task</label><input type="text" id="task-input" placeholder="What needs to get done?"/></div>
+    <div class="fg"><label>Lane</label>
+      <select id="lane-select">
+        <option value="wedding">Wedding</option>
+        <option value="reno">Renovation</option>
+        <option value="work">Work (Tiff)</option>
+        <option value="masters">Masters (Tiff)</option>
+        <option value="nic">Nic's tasks</option>
+      </select>
+    </div>
+    <div class="fg"><label>Due date (SGT)</label><input type="date" id="date-input"/></div>
+    <div class="fg"><label>Effort</label>
+      <select id="effort-select">
+        <option value="low">Low ≤1h</option>
+        <option value="med" selected>Medium 2–4h</option>
+        <option value="high">High 5h+</option>
+      </select>
+    </div>
+    <div class="fg" style="justify-content:flex-end"><button class="add-btn" id="add-btn" onclick="addTask()">+ Add</button></div>
+  </div>
+  <div class="lane-note" id="lane-note"></div>
+</div>
+
+<div class="toolbar">
+  <div class="tabs">
+    <button class="tab active" id="tab-week" onclick="switchView('week')">By Week</button>
+    <button class="tab" id="tab-lane" onclick="switchView('lane')">By Lane</button>
+    <button class="tab" id="tab-cal" onclick="switchView('cal')">Calendar</button>
+  </div>
+  <button class="export-btn" onclick="exportICS()">📅 Export .ics</button>
+</div>
+
+<div class="lane-progress" id="lane-progress"></div>
+
+<div id="view-week">
+  <div class="week-nav">
+    <button onclick="prevWeek()">← Prev</button>
+    <span class="week-label-main" id="week-label"></span>
+    <span class="week-effort-total" id="week-effort-label"></span>
+    <button onclick="nextWeek()">Next →</button>
+  </div>
+  <div class="week-summary" id="week-summary"></div>
+  <div id="overdue-banner"></div>
+  <div id="week-tasks"></div>
+</div>
+
+<div id="view-lane" style="display:none">
+  <div class="lane-columns" id="lane-columns"></div>
+</div>
+
+<div id="view-cal" style="display:none">
+  <div class="cal-nav">
+    <button onclick="prevMonth()">← Prev</button>
+    <span class="cal-month-label" id="cal-month-label"></span>
+    <button onclick="nextMonth()">Next →</button>
+  </div>
+  <div class="cal-grid" id="cal-grid"></div>
+</div>
+
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-date" id="modal-date"></div>
+      <button class="modal-close" onclick="closeModalDirect()">✕</button>
+    </div>
+    <button class="modal-gcal-btn" id="modal-gcal-btn" onclick="exportDayICS()">📅 Add this day to Google Calendar</button>
+    <div id="modal-tasks"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- EDIT MODAL -->
+<div class="edit-modal-overlay" id="edit-modal-overlay" onclick="closeEditModal(event)">
+  <div class="edit-modal">
+    <h3>Edit Task</h3>
+    <div class="edit-form-grid">
+      <div class="fg"><label>Task</label><input type="text" id="edit-text"/></div>
+      <div class="fg"><label>Lane</label>
+        <select id="edit-lane">
+          <option value="wedding">Wedding</option>
+          <option value="reno">Renovation</option>
+          <option value="work">Work (Tiff)</option>
+          <option value="masters">Masters (Tiff)</option>
+          <option value="nic">Nic's tasks</option>
+        </select>
+      </div>
+      <div class="fg"><label>Due date (SGT)</label><input type="date" id="edit-due"/></div>
+      <div class="fg"><label>Effort</label>
+        <select id="edit-effort">
+          <option value="low">Low ≤1h</option>
+          <option value="med">Medium 2–4h</option>
+          <option value="high">High 5h+</option>
+        </select>
+      </div>
+    </div>
+    <div class="edit-actions">
+      <button class="cancel-btn" onclick="closeEditModalDirect()">Cancel</button>
+      <button class="save-btn" onclick="saveEdit()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPA_URL='https://covcwpzwtdfxwekldtoy.supabase.co';
+const SUPA_KEY='sb_publishable_eMEd-W9Fco3TazjRa06gXw_wNDt0VvI';
+const {createClient}=supabase;
+const db=createClient(SUPA_URL,SUPA_KEY);
+
+// ── Ownership model ───────────────────────────────────────────────────────────
+// Lanes each user can EDIT (and add to)
+const LANE_OWNER={work:'tiff',masters:'tiff',nic:'nic',wedding:'both',reno:'both'};
+const LANE_LABELS={work:'Work',masters:'Masters',reno:'Renovation',wedding:'Wedding',nic:'Nic'};
+const LANE_COLORS={work:'var(--work)',masters:'var(--masters)',reno:'var(--reno)',wedding:'var(--wedding)',nic:'var(--nic)'};
+const OWNER_LABELS={tiff:'Tiffany only',nic:'Nic only',both:'Both'};
+const effortHours={low:1,med:3,high:6};
+const effortLabels={low:'Low ≤1h',med:'Med 2–4h',high:'High 5h+'};
+const ALL_LANES=['wedding','reno','work','masters','nic'];
+
+function canEdit(lane,user){
+  if(!user)return false;
+  const o=LANE_OWNER[lane];
+  return o==='both'||o===user;
+}
+
+// ── User state ────────────────────────────────────────────────────────────────
+let currentUser=localStorage.getItem('tracker_user')||null; // 'tiff' or 'nic'
+
+function setUser(u){
+  currentUser=u;
+  localStorage.setItem('tracker_user',u);
+  updateUserUI();
+  render();
+}
+
+function updateUserUI(){
+  const u=currentUser;
+  document.getElementById('btn-tiff').className='who-btn'+(u==='tiff'?' active-tiff':'');
+  document.getElementById('btn-nic').className='who-btn'+(u==='nic'?' active-nic':'');
+
+  // Update add form lane options based on who can add
+  const sel=document.getElementById('lane-select');
+  Array.from(sel.options).forEach(o=>{
+    o.disabled=!canEdit(o.value,u);
+  });
+  // Select first enabled option
+  const firstEnabled=Array.from(sel.options).find(o=>!o.disabled);
+  if(firstEnabled&&!canEdit(sel.value,u)) sel.value=firstEnabled.value;
+
+  // Readonly banner
+  const banner=document.getElementById('readonly-banner');
+  if(u==='tiff'){
+    banner.style.display='block';
+    banner.textContent='👔 You can view Nic\'s tasks but not edit them. Wedding & Renovation are shared.';
+  } else if(u==='nic'){
+    banner.style.display='block';
+    banner.textContent='💍 You can view Tiffany\'s Work & Masters tasks but not edit them. Wedding & Renovation are shared.';
+  } else {
+    banner.style.display='none';
+  }
+  updateLaneNote();
+}
+
+function updateLaneNote(){
+  const lane=document.getElementById('lane-select').value;
+  const note=document.getElementById('lane-note');
+  const o=LANE_OWNER[lane];
+  note.textContent=o?`Owner: ${OWNER_LABELS[o]}`:'';
+}
+document.getElementById('lane-select').addEventListener('change',updateLaneNote);
+
+// ── SGT helpers ───────────────────────────────────────────────────────────────
+function sgtToday(){const now=new Date(),sgt=new Date(now.getTime()+8*3600000);return new Date(sgt.getUTCFullYear(),sgt.getUTCMonth(),sgt.getUTCDate());}
+function pd(s){if(!s)return null;const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);}
+function fmt(d,showYear){return d.toLocaleDateString('en-SG',{day:'numeric',month:'short',...(showYear?{year:'numeric'}:{})});}
+function isOverdue(t){if(!t.due||t.done)return false;const d=pd(t.due);return d&&d<sgtToday();}
+function getWeekStart(offset){const today=sgtToday(),dow=today.getDay(),mon=new Date(today);mon.setDate(today.getDate()+(dow===0?-6:1-dow)+offset*7);return mon;}
+
+// ── ICS ───────────────────────────────────────────────────────────────────────
+function icsEsc(s){return s.replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');}
+function generateICS(list){
+  const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//TiffNicTracker//EN','CALSCALE:GREGORIAN','X-WR-CALNAME:Tiffany & Nic Tracker','X-WR-TIMEZONE:Asia/Singapore'];
+  list.filter(t=>t.due).forEach(t=>{
+    const ds=t.due.replace(/-/g,'');
+    lines.push('BEGIN:VEVENT',`UID:task-${t.id}@tiffnic`,`DTSTART;VALUE=DATE:${ds}`,`DTEND;VALUE=DATE:${ds}`,`SUMMARY:${icsEsc('['+LANE_LABELS[t.lane]+'] '+t.text)}`,`DESCRIPTION:${icsEsc('Effort: '+effortLabels[t.effort||'med']+'\\nOwner: '+OWNER_LABELS[LANE_OWNER[t.lane]])}`,`STATUS:${t.done?'COMPLETED':'CONFIRMED'}`,'END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
+function dlICS(content,name){const a=document.createElement('a');a.href='data:text/calendar;charset=utf-8,'+encodeURIComponent(content);a.download=name;a.click();}
+function exportICS(){
+  const list=currentUser==='tiff'?tasks.filter(t=>canEdit(t.lane,'tiff')||LANE_OWNER[t.lane]==='both'):currentUser==='nic'?tasks.filter(t=>canEdit(t.lane,'nic')||LANE_OWNER[t.lane]==='both'):tasks;
+  dlICS(generateICS(list.filter(t=>!t.done)),'tracker.ics');
+}
+let modalDayStr='';
+function exportDayICS(){dlICS(generateICS(tasks.filter(t=>t.due===modalDayStr)),`tasks-${modalDayStr}.ics`);}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2500);}
+
+// ── Sync status ───────────────────────────────────────────────────────────────
+function setSyncStatus(state,label){
+  const dot=document.getElementById('sync-dot');
+  dot.className='sync-dot '+(state==='live'?'live':state==='error'?'error':'loading');
+  document.getElementById('sync-label').textContent=label;
+}
+
+// ── Seed ──────────────────────────────────────────────────────────────────────
+const SEED=[
+  {id:1,text:'Book videographer',lane:'wedding',due:'2026-05-18',done:true,effort:'low'},
+  {id:2,text:'Book photographer (pre-wedding & wedding day)',lane:'wedding',due:'2026-05-01',done:true,effort:'med'},
+  {id:3,text:'Confirm majority of bridesmaids availability',lane:'wedding',due:'2026-05-15',done:true,effort:'low'},
+  {id:4,text:'Check WithJoy rates',lane:'wedding',due:'2026-05-08',done:true,effort:'low'},
+  {id:5,text:'Book matcha cart vendor',lane:'wedding',due:'2026-04-01',done:true,effort:'low'},
+  {id:6,text:'Book W Hotel venue',lane:'wedding',due:'2026-03-01',done:true,effort:'med'},
+  {id:7,text:'Confirm wedding date with venue',lane:'wedding',due:'2026-03-01',done:true,effort:'low'},
+  {id:8,text:'Book flower vendor (Get Hitched)',lane:'wedding',due:'2026-04-01',done:true,effort:'low'},
+  {id:9,text:'Buy wedding bands',lane:'wedding',due:'2026-04-01',done:true,effort:'med'},
+  {id:10,text:'Book hair & makeup — Dear Muse',lane:'wedding',due:'2026-04-01',done:true,effort:'low'},
+  {id:11,text:'Pre-wedding shoot completed',lane:'wedding',due:'2026-04-06',done:true,effort:'high'},
+  {id:12,text:'Meet parents & discuss wedding details',lane:'wedding',due:'2026-04-01',done:true,effort:'med'},
+  {id:13,text:'Determine who is paying for which items',lane:'wedding',due:'2026-04-01',done:true,effort:'med'},
+  {id:14,text:'Build initial guest list',lane:'wedding',due:'2026-04-01',done:true,effort:'med'},
+  {id:15,text:'Makeup for bride & groom booked',lane:'wedding',due:'2026-04-01',done:true,effort:'low'},
+  {id:20,text:'Book ROM date',lane:'wedding',due:'2026-06-21',done:false,effort:'low'},
+  {id:21,text:'Book solemniser / officiant',lane:'wedding',due:'2026-06-21',done:false,effort:'med'},
+  {id:22,text:'Meet officiant — discuss ceremony structure & readings',lane:'wedding',due:'2026-07-31',done:false,effort:'med'},
+  {id:23,text:'Finalise bridesmaid lineup (decide on 2 fence-sitters)',lane:'wedding',due:'2026-06-20',done:false,effort:'low'},
+  {id:24,text:'Negotiate flowers on aisle / stage with Sing Nee Soon',lane:'wedding',due:'2026-06-30',done:false,effort:'med'},
+  {id:25,text:'Find out Guo Da Li items required',lane:'wedding',due:'2026-06-30',done:false,effort:'low'},
+  {id:26,text:'Talk to parents about table allocation',lane:'wedding',due:'2026-06-30',done:false,effort:'med'},
+  {id:27,text:'Prepare wedding story for RSVP page',lane:'wedding',due:'2026-06-28',done:false,effort:'med'},
+  {id:28,text:'Select hair stylist for bridal team',lane:'wedding',due:'2026-06-28',done:false,effort:'med'},
+  {id:30,text:'Confirm RSVP platform (WithJoy) & finalise pricing',lane:'wedding',due:'2026-07-06',done:false,effort:'low'},
+  {id:31,text:'Create RSVP form and send to guests',lane:'wedding',due:'2026-07-20',done:false,effort:'med'},
+  {id:32,text:'Create wedding moodboard & colour palette',lane:'wedding',due:'2026-07-05',done:false,effort:'high'},
+  {id:33,text:'Find and shortlist wedding planner',lane:'wedding',due:'2026-07-05',done:false,effort:'high'},
+  {id:34,text:'Emcee — compare quotes & finalise',lane:'wedding',due:'2026-07-15',done:false,effort:'med'},
+  {id:35,text:'Book shuttle bus / group transportation for guests',lane:'wedding',due:'2026-07-25',done:false,effort:'med'},
+  {id:36,text:'Gown fitting appointment',lane:'wedding',due:'2026-07-31',done:false,effort:'high'},
+  {id:37,text:'Finalise wedding gown & groom\'s wear design',lane:'wedding',due:'2026-07-31',done:false,effort:'high'},
+  {id:38,text:'Schedule gown & tuxedo tryouts',lane:'wedding',due:'2026-07-31',done:false,effort:'med'},
+  {id:39,text:'Suit fitting for Nic',lane:'wedding',due:'2026-07-31',done:false,effort:'high'},
+  {id:40,text:'Prepare honeymoon schedule & destination, redeem miles',lane:'wedding',due:'2026-07-31',done:false,effort:'high'},
+  {id:41,text:'Book block accommodation for out-of-town guests',lane:'wedding',due:'2026-07-31',done:false,effort:'med'},
+  {id:42,text:'Email companies for freebies / sponsorships',lane:'wedding',due:'2026-07-31',done:false,effort:'med'},
+  {id:43,text:'Check vendor milestone payment due dates',lane:'wedding',due:'2026-07-15',done:false,effort:'low'},
+  {id:50,text:'Prepare & send wedding invites',lane:'wedding',due:'2026-08-15',done:false,effort:'high'},
+  {id:51,text:'Decide on wedding entertainment (band / DJ)',lane:'wedding',due:'2026-08-31',done:false,effort:'med'},
+  {id:52,text:'Book entertainment (band / DJ)',lane:'wedding',due:'2026-09-19',done:false,effort:'med'},
+  {id:53,text:'Determine wedding song list & "no nos"',lane:'wedding',due:'2026-08-31',done:false,effort:'med'},
+  {id:54,text:'Hair & makeup trial — book date (Tiff)',lane:'wedding',due:'2026-08-15',done:false,effort:'low'},
+  {id:55,text:'Add on mum\'s hair & makeup',lane:'wedding',due:'2026-08-15',done:false,effort:'low'},
+  {id:56,text:'Arrange food tasting with W Hotel',lane:'wedding',due:'2026-09-30',done:false,effort:'high'},
+  {id:57,text:'Settle honeymoon itinerary',lane:'wedding',due:'2026-09-30',done:false,effort:'high'},
+  {id:60,text:'Organise custom wedding shoes',lane:'wedding',due:'2026-10-15',done:false,effort:'med'},
+  {id:61,text:'Organise custom made wedding jewellery',lane:'wedding',due:'2026-10-15',done:false,effort:'med'},
+  {id:62,text:'Commission custom wedding gifts / favours',lane:'wedding',due:'2026-10-15',done:false,effort:'high'},
+  {id:63,text:'Collect custom made wedding gown & groom\'s wear',lane:'wedding',due:'2026-10-31',done:false,effort:'med'},
+  {id:64,text:'Book florist & finalise all flower requirements',lane:'wedding',due:'2026-10-15',done:false,effort:'med'},
+  {id:65,text:'Communicate logistics to guests (directions, dress code)',lane:'wedding',due:'2026-10-31',done:false,effort:'med'},
+  {id:66,text:'Book hair & makeup test run',lane:'wedding',due:'2026-10-31',done:false,effort:'low'},
+  {id:67,text:'Prepare wedding dance / book dance lessons',lane:'wedding',due:'2026-10-31',done:false,effort:'high'},
+  {id:68,text:'Check vendor milestone payment due dates (2nd)',lane:'wedding',due:'2026-10-15',done:false,effort:'low'},
+  {id:70,text:'Draft actual day timeline',lane:'wedding',due:'2026-11-01',done:false,effort:'high'},
+  {id:75,text:'Collect custom wedding gifts / favours',lane:'wedding',due:'2026-11-15',done:false,effort:'med'},
+  {id:76,text:'Send save-the-date reminders (follow-up)',lane:'wedding',due:'2026-11-01',done:false,effort:'low'},
+  {id:77,text:'Finalise RSVPs',lane:'wedding',due:'2026-11-14',done:false,effort:'med'},
+  {id:78,text:'Confirm bridal party attire',lane:'wedding',due:'2026-11-15',done:false,effort:'med'},
+  {id:79,text:'Schedule bakery tastings & finalise wedding cake vendor',lane:'wedding',due:'2026-11-15',done:false,effort:'high'},
+  {id:80,text:'Schedule trial hair & makeup look',lane:'wedding',due:'2026-11-15',done:false,effort:'med'},
+  {id:81,text:'Book spa & beauty care treatments',lane:'wedding',due:'2026-11-30',done:false,effort:'low'},
+  {id:82,text:'Check final vendor milestone payments',lane:'wedding',due:'2026-11-30',done:false,effort:'low'},
+  {id:83,text:'Book rehearsal dinner venue',lane:'wedding',due:'2026-11-30',done:false,effort:'med'},
+  {id:84,text:'Finalise guest list',lane:'wedding',due:'2026-11-14',done:false,effort:'med'},
+  {id:88,text:'Collect custom made wedding jewellery',lane:'wedding',due:'2026-12-15',done:false,effort:'low'},
+  {id:89,text:'Organise Tea Ceremony & Guo Da Li logistics',lane:'wedding',due:'2026-12-15',done:false,effort:'high'},
+  {id:90,text:'Confirm wedding seating plan',lane:'wedding',due:'2026-12-20',done:false,effort:'high'},
+  {id:91,text:'Confirm dinner menus & dietary needs with W Hotel',lane:'wedding',due:'2026-12-20',done:false,effort:'med'},
+  {id:92,text:'Confirm bridal fittings for final alterations',lane:'wedding',due:'2026-12-20',done:false,effort:'med'},
+  {id:93,text:'Confirm helpers on wedding day & their roles',lane:'wedding',due:'2026-12-20',done:false,effort:'med'},
+  {id:94,text:'Confirm wedding cash gift receiver',lane:'wedding',due:'2026-12-28',done:false,effort:'low'},
+  {id:95,text:'Confirm date / time / location with all vendors',lane:'wedding',due:'2026-12-28',done:false,effort:'med'},
+  {id:96,text:'Develop wedding day timetable & helper responsibilities',lane:'wedding',due:'2026-12-20',done:false,effort:'high'},
+  {id:97,text:'Write wedding vows & coordinate with officiant',lane:'wedding',due:'2026-12-20',done:false,effort:'high'},
+  {id:100,text:'Tea ceremony & pre-event ceremony prep',lane:'wedding',due:'2027-01-03',done:false,effort:'high'},
+  {id:101,text:'Meet the in-laws (formal)',lane:'wedding',due:'2027-01-03',done:false,effort:'med'},
+  {id:102,text:'Wedding rehearsal — run through with bridal party',lane:'wedding',due:'2027-01-07',done:false,effort:'high'},
+  {id:103,text:'Check wedding cake, flowers & banquet on schedule',lane:'wedding',due:'2027-01-08',done:false,effort:'med'},
+  {id:104,text:'Beauty treatments (pre-wedding)',lane:'wedding',due:'2027-01-06',done:false,effort:'med'},
+  {id:105,text:'Confirm venue décor setup with florist',lane:'wedding',due:'2027-01-05',done:false,effort:'med'},
+  {id:106,text:'Hen\'s / bachelorette party',lane:'wedding',due:'2027-01-07',done:false,effort:'high'},
+  {id:110,text:'Send thank you cards to guests',lane:'wedding',due:'2027-02-07',done:false,effort:'high'},
+  {id:111,text:'Finalize all vendor payments',lane:'wedding',due:'2027-01-20',done:false,effort:'med'},
+  // RENO
+  {id:200,text:'Finalise renovation moodboard & theme',lane:'reno',due:'2026-06-14',done:false,effort:'high'},
+  {id:201,text:'Review items to remove or change in current home',lane:'reno',due:'2026-06-14',done:false,effort:'med'},
+  {id:202,text:'Book first ID appointment',lane:'reno',due:'2026-06-14',done:false,effort:'low'},
+  {id:203,text:'Fill up budget sheet (items to buy by room)',lane:'reno',due:'2026-06-21',done:false,effort:'high'},
+  {id:204,text:'Sign up for group buy',lane:'reno',due:'2026-07-31',done:false,effort:'low'},
+  {id:205,text:'Furniture shopping SG / JB',lane:'reno',due:'2026-07-31',done:false,effort:'high'},
+  {id:206,text:'Taobao items — compile list and order',lane:'reno',due:'2026-08-16',done:false,effort:'high'},
+  {id:207,text:'Send floor plan to FS master',lane:'reno',due:'2026-02-20',done:true,effort:'low'},
+  {id:208,text:'Create renovation budget sheet',lane:'reno',due:'2026-01-20',done:true,effort:'med'},
+  // WORK (Tiff)
+  {id:400,text:'Weekly work planning & priorities',lane:'work',due:'2026-06-09',done:false,effort:'med'},
+  // MASTERS (Tiff)
+  {id:300,text:'MGT 6201 — Purchase HBSP course pack',lane:'masters',due:'2026-06-08',done:false,effort:'low'},
+  {id:301,text:'MGT 6201 — Accounting Exam',lane:'masters',due:'2026-06-05',done:true,effort:'high'},
+  {id:302,text:'MGT 6201 — Finance: watch async video lessons',lane:'masters',due:'2026-06-14',done:false,effort:'high'},
+  {id:303,text:'MGT 6201 — Finance Zoom (Tue 9 Jun 7pm ET / Wed 7am SGT)',lane:'masters',due:'2026-06-09',done:false,effort:'med'},
+  {id:304,text:'MGT 6201 — Finance Zoom (Thu 11 Jun 7pm ET / Fri 7am SGT)',lane:'masters',due:'2026-06-11',done:false,effort:'med'},
+  {id:305,text:'MGT 6201 — Finance Zoom (Thu 18 Jun 7pm ET / Fri 7am SGT)',lane:'masters',due:'2026-06-18',done:false,effort:'med'},
+  {id:306,text:'MGT 6201 — Finance Exam (window closes 25 Jun)',lane:'masters',due:'2026-06-25',done:false,effort:'high'},
+  {id:307,text:'MGT 6201 — Supply Chain: watch async video lessons',lane:'masters',due:'2026-07-05',done:false,effort:'high'},
+  {id:308,text:'MGT 6201 — Supply Chain Zoom (Mon 29 Jun 8:30pm ET)',lane:'masters',due:'2026-06-29',done:false,effort:'med'},
+  {id:309,text:'MGT 6201 — Supply Chain Zoom (Wed 1 Jul 8:30pm ET)',lane:'masters',due:'2026-07-01',done:false,effort:'med'},
+  {id:310,text:'MGT 6201 — Supply Chain Simulation due',lane:'masters',due:'2026-07-07',done:false,effort:'high'},
+  {id:311,text:'MGT 6201 — Supply Chain Zoom (Wed 8 Jul 8:30pm ET)',lane:'masters',due:'2026-07-08',done:false,effort:'med'},
+  {id:312,text:'MGT 6201 — Supply Chain Exam (window closes 16 Jul)',lane:'masters',due:'2026-07-16',done:false,effort:'high'},
+  {id:313,text:'MGT 6201 — Marketing: watch async video lessons',lane:'masters',due:'2026-07-19',done:false,effort:'high'},
+  {id:314,text:'MGT 6201 — Marketing Zoom (Mon 20 Jul 7pm ET)',lane:'masters',due:'2026-07-20',done:false,effort:'med'},
+  {id:315,text:'MGT 6201 — Marketing Zoom (Wed 22 Jul 7pm ET)',lane:'masters',due:'2026-07-22',done:false,effort:'med'},
+  {id:316,text:'MGT 6201 — Marketing Simulation due',lane:'masters',due:'2026-07-26',done:false,effort:'high'},
+  {id:317,text:'MGT 6201 — Marketing Zoom (Mon 27 Jul 7pm ET)',lane:'masters',due:'2026-07-27',done:false,effort:'med'},
+  {id:318,text:'MGT 6201 — Marketing Exam (window closes 2 Aug)',lane:'masters',due:'2026-08-02',done:false,effort:'high'},
+  // NIC lane placeholder
+  {id:500,text:'Add Nic\'s tasks here',lane:'nic',due:'2026-06-30',done:false,effort:'med'},
+];
+
+let tasks=[],weekOffset=0,calYear=2026,calMonth=5,currentView='week';
+
+// ── Supabase ──────────────────────────────────────────────────────────────────
+async function fetchTasks(){const{data,error}=await db.from('tasks').select('*').order('id');if(error)throw error;return data;}
+async function seedIfEmpty(){const{count}=await db.from('tasks').select('*',{count:'exact',head:true});if(count===0){const{error}=await db.from('tasks').insert(SEED);if(error)throw error;toast('Tasks loaded ✓');}}
+async function upsertTask(t){const{error}=await db.from('tasks').upsert({id:t.id,text:t.text,lane:t.lane,due:t.due,done:t.done,effort:t.effort||'med'});if(error)throw error;}
+async function removeTask(id){const{error}=await db.from('tasks').delete().eq('id',id);if(error)throw error;}
+
+function subscribeRealtime(){
+  db.channel('tasks-rt').on('postgres_changes',{event:'*',schema:'public',table:'tasks'},payload=>{
+    const{eventType,new:n,old:o}=payload;
+    if(eventType==='INSERT'||eventType==='UPDATE'){const idx=tasks.findIndex(t=>t.id===n.id);if(idx>=0)tasks[idx]=n;else tasks.push(n);}
+    else if(eventType==='DELETE')tasks=tasks.filter(t=>t.id!==o.id);
+    render();
+  }).subscribe(s=>{
+    if(s==='SUBSCRIBED')setSyncStatus('live','Live sync');
+    else if(s==='CHANNEL_ERROR')setSyncStatus('error','Sync error');
+  });
+}
+
+async function init(){
+  setSyncStatus('loading','Connecting…');
+  try{
+    await seedIfEmpty();
+    tasks=await fetchTasks();
+    setSyncStatus('live','Live sync');
+    subscribeRealtime();
+  }catch(e){setSyncStatus('error','Connection error');console.error(e);}
+  const now=sgtToday();calYear=now.getFullYear();calMonth=now.getMonth();
+  updateUserUI();
+  render();
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+async function addTask(){
+  if(!currentUser){toast('Select Tiffany or Nic first');return;}
+  const text=document.getElementById('task-input').value.trim();
+  const lane=document.getElementById('lane-select').value;
+  const due=document.getElementById('date-input').value;
+  const effort=document.getElementById('effort-select').value;
+  if(!text)return;
+  if(!canEdit(lane,currentUser)){toast('You can\'t add to this lane');return;}
+  const btn=document.getElementById('add-btn');btn.disabled=true;
+  const t={id:Date.now(),text,lane,due,done:false,effort};
+  try{await upsertTask(t);tasks.push(t);document.getElementById('task-input').value='';toast('Task added ✓');render();}
+  catch(e){toast('Failed to save');}
+  btn.disabled=false;
+}
+document.getElementById('task-input').addEventListener('keydown',e=>{if(e.key==='Enter')addTask();});
+
+async function toggleDone(id){
+  const t=tasks.find(t=>t.id===id);if(!t)return;
+  if(!canEdit(t.lane,currentUser)){toast('This lane is read-only for you');return;}
+  t.done=!t.done;render();
+  try{await upsertTask(t);toast(t.done?'Done ✓':'Marked pending');}
+  catch(e){t.done=!t.done;render();toast('Save failed');}
+}
+async function deleteTask(id){
+  const t=tasks.find(t=>t.id===id);if(!t)return;
+  if(!canEdit(t.lane,currentUser)){toast('This lane is read-only for you');return;}
+  tasks=tasks.filter(t=>t.id!==id);render();
+  try{await removeTask(id);toast('Deleted');}
+  catch(e){toast('Delete failed');}
+}
+
+function switchView(v){
+  currentView=v;
+  ['week','lane','cal'].forEach(x=>{document.getElementById('view-'+x).style.display=x===v?'':'none';document.getElementById('tab-'+x).classList.toggle('active',x===v);});
+  document.getElementById('lane-progress').style.display=v==='cal'?'none':'';
+  render();
+}
+function prevWeek(){weekOffset--;renderWeek();}
+function nextWeek(){weekOffset++;renderWeek();}
+function prevMonth(){calMonth--;if(calMonth<0){calMonth=11;calYear--;}renderCal();}
+function nextMonth(){calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderCal();}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function effortBadge(e){const ef=e||'med';return `<span class="effort-badge effort-${ef}">${effortLabels[ef]}</span>`;}
+function ownerBadge(lane){const o=LANE_OWNER[lane];return `<span class="owner-badge owner-${o==='tiff'?'tiff':o==='nic'?'nic':'both'}">${o==='tiff'?'Tiffany':o==='nic'?'Nic':'Both'}</span>`;}
+function wkHrs(wt){return wt.filter(t=>!t.done).reduce((s,t)=>s+effortHours[t.effort||'med'],0);}
+
+function taskCard(t,showLane){
+  const d=pd(t.due),ov=isOverdue(t),yr=d&&d.getFullYear()>2026;
+  const ds=d?(ov?`⚠ Overdue · ${fmt(d)}`:`Due ${fmt(d,yr)}`):'No due date';
+  const ro=!canEdit(t.lane,currentUser);
+  return `<div class="task-card ${t.lane} ${t.done?'done':''} ${ro?'readonly-card':''}">
+    <div class="task-check ${t.done?'checked':''} ${ro?'disabled-check':''}" onclick="${ro?'toast(\'Read-only\')':'toggleDone('+t.id+')'}"></div>
+    <div class="task-body">
+      <div class="task-text">${t.text}</div>
+      <div class="task-meta">
+        ${showLane?`<span class="task-lane-tag tag-${t.lane}">${LANE_LABELS[t.lane]}</span>`:''}
+        <span class="task-date ${ov&&!t.done?'task-overdue':''}">${ds}</span>
+        ${effortBadge(t.effort)}
+        ${ownerBadge(t.lane)}
+      </div>
+    </div>
+    <button class="task-edit ${ro?'hidden':''}" onclick="openEditModal(${t.id})" title="Edit">✎</button>
+    <button class="task-del ${ro?'hidden':''}" onclick="deleteTask(${t.id})" title="Delete">✕</button>
+  </div>`;
+}
+
+function renderLaneProgress(){
+  const ws=getWeekStart(weekOffset),we=new Date(ws);we.setDate(ws.getDate()+6);
+  document.getElementById('lane-progress').innerHTML=ALL_LANES.map(l=>{
+    const wO=tasks.filter(t=>t.lane===l&&!t.done&&pd(t.due)>=ws&&pd(t.due)<=we);
+    const wD=tasks.filter(t=>t.lane===l&&t.done&&pd(t.due)>=ws&&pd(t.due)<=we);
+    const wT=wO.length+wD.length;
+    const pct=wT?Math.round(wD.length/wT*100):100;
+    const hrs=wkHrs(wO);
+    const ro=currentUser&&!canEdit(l,currentUser);
+    return `<div class="lp-card ${ro?'locked-card':''}">
+      <div class="lp-title" style="color:${LANE_COLORS[l]}">${LANE_LABELS[l]}</div>
+      <div class="lp-bar"><div class="lp-fill" style="width:${pct}%;background:${LANE_COLORS[l]}"></div></div>
+      <div class="lp-label">${wD.length}/${wT} this week</div>
+      <div class="lp-hrs">${hrs>0?`~${hrs}h left`:'Clear ✓'}</div>
+      ${ro?`<div class="lp-lock">👁 view only</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function renderWeek(){
+  const ws=getWeekStart(weekOffset),we=new Date(ws);we.setDate(ws.getDate()+6);
+  const yr=we.getFullYear()>2026;
+  document.getElementById('week-label').textContent=`${fmt(ws)} – ${fmt(we,yr)}`;
+  const wt=tasks.filter(t=>{const d=pd(t.due);return d&&d>=ws&&d<=we;});
+  document.getElementById('week-effort-label').textContent=wkHrs(wt)>0?`~${wkHrs(wt)}h total effort`:'';
+  const ov=tasks.filter(t=>isOverdue(t));
+  document.getElementById('overdue-banner').innerHTML=ov.length&&weekOffset===0?`<div class="overdue-banner">⚠ ${ov.length} overdue task${ov.length>1?'s':''} — check previous weeks</div>`:'';
+  document.getElementById('week-summary').innerHTML=ALL_LANES.map(l=>{
+    const c=wt.filter(t=>t.lane===l&&!t.done).length;
+    return c>0?`<span class="lane-pill pill-${l}">${LANE_LABELS[l]} · ${c}</span>`:'';
+  }).join('');
+  const sorted=[...wt].sort((a,b)=>(pd(a.due)||0)-(pd(b.due)||0));
+  const pend=sorted.filter(t=>!t.done),done=sorted.filter(t=>t.done);
+  let html=pend.map(t=>taskCard(t,true)).join('');
+  if(done.length)html+=`<div class="section-label">Done</div>`+done.map(t=>taskCard(t,true)).join('');
+  document.getElementById('week-tasks').innerHTML=html||`<div class="empty-state">Nothing due this week 🎉</div>`;
+}
+
+function renderLane(){
+  document.getElementById('lane-columns').innerHTML=ALL_LANES.map(l=>{
+    const lt=tasks.filter(t=>t.lane===l);
+    const pend=lt.filter(t=>!t.done).sort((a,b)=>{const da=pd(a.due),db=pd(b.due);if(!da&&!db)return 0;if(!da)return 1;if(!db)return-1;return da-db;});
+    const done=lt.filter(t=>t.done);
+    const ro=currentUser&&!canEdit(l,currentUser);
+    return `<div class="lane-col ${ro?'readonly-col':''}">
+      <div class="lane-col-header">
+        <span class="lane-col-title" style="color:${LANE_COLORS[l]}">${LANE_LABELS[l]}</span>
+        <span class="lane-count">${ro?'👁 view only · ':''} ${pend.length} open</span>
+      </div>
+      ${pend.length===0&&done.length===0?'<div class="empty-state">No tasks</div>':''}
+      ${pend.map(t=>taskCard(t,false)).join('')}
+      ${done.length?`<div class="section-label">Done</div>${done.map(t=>taskCard(t,false)).join('')}`:''}
+    </div>`;
+  }).join('');
+}
+
+function renderCal(){
+  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-month-label').textContent=`${months[calMonth]} ${calYear}`;
+  const firstDow=new Date(calYear,calMonth,1).getDay();
+  const dim=new Date(calYear,calMonth+1,0).getDate();
+  const startPad=firstDow===0?6:firstDow-1;
+  const today=sgtToday();
+  let html=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  const prevDays=new Date(calYear,calMonth,0).getDate();
+  for(let i=startPad-1;i>=0;i--) html+=`<div class="cal-day other-month"><div class="cal-day-num">${prevDays-i}</div></div>`;
+  for(let day=1;day<=dim;day++){
+    const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isToday=new Date(calYear,calMonth,day).getTime()===today.getTime();
+    const dt=tasks.filter(t=>t.due===ds);
+    const shown=dt.slice(0,3),extra=dt.length-3;
+    const dlabel=new Date(calYear,calMonth,day).toLocaleDateString('en-SG',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    html+=`<div class="cal-day${isToday?' today':''}" onclick="openModal('${ds}','${dlabel}')">
+      <div class="cal-day-num">${day}</div>
+      ${shown.map(t=>`<div class="cal-dot dot-${t.lane} ${t.done?'dot-done':''}">${t.text}</div>`).join('')}
+      ${extra>0?`<div class="cal-more">+${extra} more</div>`:''}
+    </div>`;
+  }
+  const total=Math.ceil((startPad+dim)/7)*7;
+  for(let i=1;i<=total-(startPad+dim);i++) html+=`<div class="cal-day other-month"><div class="cal-day-num">${i}</div></div>`;
+  document.getElementById('cal-grid').innerHTML=html;
+}
+
+function openModal(ds,label){
+  modalDayStr=ds;
+  document.getElementById('modal-date').textContent=label;
+  const dt=tasks.filter(t=>t.due===ds);
+  const pend=dt.filter(t=>!t.done),done=dt.filter(t=>t.done);
+  let html='';
+  if(!dt.length)html='<div class="empty-state">No tasks this day</div>';
+  else{html+=pend.map(t=>taskCard(t,true)).join('');if(done.length)html+=`<div class="section-label">Done</div>`+done.map(t=>taskCard(t,true)).join('');}
+  document.getElementById('modal-tasks').innerHTML=html;
+  document.getElementById('modal-gcal-btn').style.display=dt.length?'inline-flex':'none';
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal(e){if(e.target===document.getElementById('modal-overlay'))closeModalDirect();}
+function closeModalDirect(){document.getElementById('modal-overlay').classList.remove('open');render();}
+
+// ── Edit modal ────────────────────────────────────────────────────────────────
+let editingId=null;
+
+function openEditModal(id){
+  const t=tasks.find(t=>t.id===id);if(!t)return;
+  if(!canEdit(t.lane,currentUser)){toast('This lane is read-only for you');return;}
+  editingId=id;
+  document.getElementById('edit-text').value=t.text;
+  document.getElementById('edit-lane').value=t.lane;
+  document.getElementById('edit-due').value=t.due||'';
+  document.getElementById('edit-effort').value=t.effort||'med';
+  // Lock lane options based on user
+  Array.from(document.getElementById('edit-lane').options).forEach(o=>{
+    o.disabled=!canEdit(o.value,currentUser);
+  });
+  document.getElementById('edit-modal-overlay').classList.add('open');
+}
+
+async function saveEdit(){
+  const t=tasks.find(t=>t.id===editingId);if(!t)return;
+  const newLane=document.getElementById('edit-lane').value;
+  if(!canEdit(newLane,currentUser)){toast('Cannot move to a lane you don\'t own');return;}
+  t.text=document.getElementById('edit-text').value.trim()||t.text;
+  t.lane=newLane;
+  t.due=document.getElementById('edit-due').value;
+  t.effort=document.getElementById('edit-effort').value;
+  closeEditModalDirect();
+  render();
+  try{await upsertTask(t);toast('Task updated ✓');}
+  catch(e){toast('Save failed — try again');}
+}
+
+function closeEditModal(e){if(e.target===document.getElementById('edit-modal-overlay'))closeEditModalDirect();}
+function closeEditModalDirect(){document.getElementById('edit-modal-overlay').classList.remove('open');editingId=null;}
+
+function render(){
+  renderLaneProgress();
+  if(currentView==='week')renderWeek();
+  else if(currentView==='lane')renderLane();
+  else renderCal();
+}
+
+const _t=sgtToday();
+document.getElementById('date-input').value=`${_t.getFullYear()}-${String(_t.getMonth()+1).padStart(2,'0')}-${String(_t.getDate()).padStart(2,'0')}`;
+init();
+</script>
+</body>
+</html>
