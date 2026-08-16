@@ -197,12 +197,55 @@ input:focus,select:focus{border-color:var(--text);}
 .toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--text);color:var(--bg);font-size:11px;padding:10px 16px;border-radius:8px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;}
 .toast.show{opacity:1;}
 
+/* COUNTDOWN */
+.countdown{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1.25rem;}
+.cd-chip{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 13px;font-size:10px;letter-spacing:.04em;color:var(--muted);}
+.cd-chip b{font-family:'Fraunces',serif;font-size:13px;font-weight:600;font-style:italic;margin-right:5px;}
+.cd-wedding{background:var(--wedding-bg);border-color:var(--wedding-bd);color:var(--wedding);}
+.cd-reno{background:var(--reno-bg);border-color:var(--reno-bd);color:var(--reno);}
+
+/* FILTER BAR */
+.filter-bar{display:flex;align-items:center;gap:6px;margin-bottom:1.25rem;flex-wrap:wrap;}
+.search-input{font-family:'DM Mono',monospace;font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:6px 13px;color:var(--text);outline:none;width:210px;}
+.search-input:focus{border-color:var(--text);}
+.chip{font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.05em;padding:5px 11px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:all .15s;}
+.chip.on{background:var(--text);color:var(--bg);border-color:var(--text);}
+.chip-sep{width:1px;height:18px;background:var(--border);margin:0 4px;}
+.filter-clear{font-family:'DM Mono',monospace;font-size:10px;background:none;border:none;color:var(--muted);cursor:pointer;text-decoration:underline;}
+
+/* OVERDUE PANEL */
+.overdue-panel{border:1px solid var(--work-bd);background:var(--work-bg);border-radius:12px;padding:12px 14px;margin-bottom:1rem;}
+.od-head{display:flex;align-items:center;gap:10px;cursor:pointer;}
+.od-title{font-size:11px;color:var(--work);letter-spacing:.04em;font-weight:500;}
+.od-hrs{font-size:10px;color:var(--work);opacity:.75;margin-left:auto;}
+.od-caret{font-size:10px;color:var(--work);}
+.od-body{margin-top:10px;max-height:340px;overflow-y:auto;}
+.od-body .task-card{background:var(--surface);}
+.od-bulk{font-family:'DM Mono',monospace;font-size:10px;background:var(--surface);border:1px solid var(--work-bd);color:var(--work);border-radius:6px;padding:4px 10px;cursor:pointer;margin-top:8px;}
+.od-bulk:hover{background:#fff;}
+
+/* SNOOZE */
+.task-snooze{font-size:11px;color:var(--muted);cursor:pointer;background:none;border:none;padding:4px;opacity:0;transition:opacity .15s;flex-shrink:0;}
+.task-card:hover .task-snooze:not(.hidden){opacity:1;}
+.task-snooze:hover{color:var(--reno);}
+.task-snooze.hidden{pointer-events:none;visibility:hidden;}
+
+.today-btn{font-family:'DM Mono',monospace;font-size:11px;background:var(--text);color:var(--bg);border:none;border-radius:6px;padding:4px 12px;cursor:pointer;}
+.week-effort-total b{color:var(--text);font-weight:500;}
+.refresh-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0 2px;}
+.refresh-btn:hover{color:var(--text);}
+:focus-visible{outline:2px solid var(--text);outline-offset:2px;}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+
 @media(max-width:750px){
+  body{padding:1rem;}
   .add-form-grid{grid-template-columns:1fr 1fr;}
   .lane-progress{grid-template-columns:repeat(2,1fr);}
   .lane-columns{grid-template-columns:1fr;}
-  .cal-dot{display:none;}
-  .cal-day{min-height:48px;}
+  .cal-dot{font-size:0;padding:0;height:4px;margin-bottom:2px;border-radius:2px;}
+  .cal-day{min-height:58px;}
+  .search-input{width:100%;}
+  .task-edit,.task-del,.task-snooze{opacity:1;}
 }
 </style>
 </head>
@@ -219,8 +262,11 @@ input:focus,select:focus{border-color:var(--text);}
   <button class="who-btn" id="btn-nic" onclick="setUser('nic')">👔 Nic</button>
   <div class="sync-dot loading" id="sync-dot"></div>
   <span class="sync-label" id="sync-label">Connecting…</span>
+  <button class="refresh-btn" onclick="hardRefresh()" title="Reload from server" aria-label="Reload from server">⟳</button>
   <span class="sgt-badge">🕐 SGT</span>
 </div>
+
+<div class="countdown" id="countdown"></div>
 
 <div class="readonly-banner" id="readonly-banner"></div>
 
@@ -266,12 +312,23 @@ input:focus,select:focus{border-color:var(--text);}
   <button class="export-btn" onclick="exportICS()">📅 Export .ics</button>
 </div>
 
+<div class="filter-bar" id="filter-bar">
+  <input type="text" class="search-input" id="search-input" placeholder="Search tasks…" aria-label="Search tasks"/>
+  <span class="chip-sep"></span>
+  <button class="chip" id="chip-pic-tiff" onclick="togglePic('tiff')">💍 Tiff</button>
+  <button class="chip" id="chip-pic-nic" onclick="togglePic('nic')">👔 Nic</button>
+  <span class="chip-sep"></span>
+  <span id="lane-chips"></span>
+  <button class="filter-clear" id="filter-clear" onclick="clearFilters()" style="display:none">Clear filters</button>
+</div>
+
 <div class="lane-progress" id="lane-progress"></div>
 
 <div id="view-week">
   <div class="week-nav">
     <button onclick="prevWeek()">← Prev</button>
     <span class="week-label-main" id="week-label"></span>
+    <button class="today-btn" id="today-btn" onclick="goToday()" style="display:none">Today</button>
     <span class="week-effort-total" id="week-effort-label"></span>
     <button onclick="nextWeek()">Next →</button>
   </div>
@@ -360,6 +417,35 @@ const effortHours={low:1,med:3,high:6};
 const effortLabels={low:'Low ≤1h',med:'Med 2–4h',high:'High 5h+'};
 const ALL_LANES=['wedding','reno','work','masters','nic'];
 
+// ── Key dates ── edit these two lines if the dates move ───────────────────────
+const KEY_DATES=[
+  {label:'Wedding day', date:'2027-01-09', cls:'cd-wedding'},
+  {label:'Reno handover', date:'2026-11-30', cls:'cd-reno'},
+];
+
+// ── Escaping ──────────────────────────────────────────────────────────────────
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+// ── Filters ───────────────────────────────────────────────────────────────────
+let filterText='',filterPic=null,filterLanes=new Set();
+function anyFilter(){return !!filterText||!!filterPic||filterLanes.size>0;}
+function matchesFilter(t){
+  if(filterText&&!t.text.toLowerCase().includes(filterText))return false;
+  if(filterPic&&(t.pic||'both')!==filterPic&&(t.pic||'both')!=='both')return false;
+  if(filterLanes.size&&!filterLanes.has(t.lane))return false;
+  return true;
+}
+function togglePic(p){filterPic=filterPic===p?null:p;syncFilterUI();render();}
+function toggleLane(l){filterLanes.has(l)?filterLanes.delete(l):filterLanes.add(l);syncFilterUI();render();}
+function clearFilters(){filterText='';filterPic=null;filterLanes.clear();document.getElementById('search-input').value='';syncFilterUI();render();}
+function syncFilterUI(){
+  document.getElementById('chip-pic-tiff').classList.toggle('on',filterPic==='tiff');
+  document.getElementById('chip-pic-nic').classList.toggle('on',filterPic==='nic');
+  document.getElementById('lane-chips').innerHTML=visibleLanes().map(l=>
+    `<button class="chip ${filterLanes.has(l)?'on':''}" onclick="toggleLane('${l}')">${LANE_LABELS[l]}</button>`).join(' ');
+  document.getElementById('filter-clear').style.display=anyFilter()?'':'none';
+}
+
 function canEdit(lane,user){
   if(!user)return false;
   const o=LANE_OWNER[lane];
@@ -402,6 +488,7 @@ function updateUserUI(){
     banner.style.display='none';
   }
   updateLaneNote();
+  syncFilterUI();
 }
 
 function updateLaneNote(){
@@ -416,6 +503,7 @@ document.getElementById('lane-select').addEventListener('change',updateLaneNote)
 function sgtToday(){const now=new Date(),sgt=new Date(now.getTime()+8*3600000);return new Date(sgt.getUTCFullYear(),sgt.getUTCMonth(),sgt.getUTCDate());}
 function pd(s){if(!s)return null;const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);}
 function fmt(d,showYear){return d.toLocaleDateString('en-SG',{day:'numeric',month:'short',...(showYear?{year:'numeric'}:{})});}
+function fmtISO(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function isOverdue(t){if(!t.due||t.done)return false;const d=pd(t.due);return d&&d<sgtToday();}
 function getWeekStart(offset){const today=sgtToday(),dow=today.getDay(),mon=new Date(today);mon.setDate(today.getDate()+(dow===0?-6:1-dow)+offset*7);return mon;}
 
@@ -575,20 +663,48 @@ let tasks=[],weekOffset=0,calYear=2026,calMonth=5,currentView='week';
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 async function fetchTasks(){const{data,error}=await db.from('tasks').select('*').order('id');if(error)throw error;return data;}
-async function seedIfEmpty(){const{count}=await db.from('tasks').select('*',{count:'exact',head:true});if(count===0){const{error}=await db.from('tasks').insert(SEED);if(error)throw error;toast('Tasks loaded ✓');}}
-async function upsertTask(t){const{error}=await db.from('tasks').upsert({id:t.id,text:t.text,lane:t.lane,due:t.due,done:t.done,effort:t.effort||'med',pic:t.pic||'both'});if(error)throw error;}
+async function seedIfEmpty(){
+  const{count}=await db.from('tasks').select('*',{count:'exact',head:true});
+  if(count!==0)return;
+  // upsert, not insert: if both of you open an empty board at once, no duplicate-key crash
+  const{error}=await db.from('tasks').upsert(SEED,{onConflict:'id',ignoreDuplicates:true});
+  if(error)throw error;
+  toast('Tasks loaded ✓');
+}
+async function upsertTask(t){const{error}=await db.from('tasks').upsert({id:t.id,text:t.text,lane:t.lane,due:t.due||null,done:t.done,effort:t.effort||'med',pic:t.pic||'both'});if(error)throw error;}
 async function removeTask(id){const{error}=await db.from('tasks').delete().eq('id',id);if(error)throw error;}
 
+let rtChannel=null,retryTimer=null,retryDelay=2000;
+
 function subscribeRealtime(){
-  db.channel('tasks-rt').on('postgres_changes',{event:'*',schema:'public',table:'tasks'},payload=>{
+  if(rtChannel){db.removeChannel(rtChannel);rtChannel=null;}
+  rtChannel=db.channel('tasks-rt').on('postgres_changes',{event:'*',schema:'public',table:'tasks'},payload=>{
     const{eventType,new:n,old:o}=payload;
     if(eventType==='INSERT'||eventType==='UPDATE'){const idx=tasks.findIndex(t=>t.id===n.id);if(idx>=0)tasks[idx]=n;else tasks.push(n);}
     else if(eventType==='DELETE')tasks=tasks.filter(t=>t.id!==o.id);
     render();
   }).subscribe(s=>{
-    if(s==='SUBSCRIBED')setSyncStatus('live','Live sync');
-    else if(s==='CHANNEL_ERROR')setSyncStatus('error','Sync error');
+    if(s==='SUBSCRIBED'){setSyncStatus('live','Live sync');retryDelay=2000;}
+    else if(s==='CHANNEL_ERROR'||s==='TIMED_OUT'||s==='CLOSED'){
+      setSyncStatus('error','Reconnecting…');
+      clearTimeout(retryTimer);
+      retryTimer=setTimeout(()=>{retryDelay=Math.min(retryDelay*2,30000);hardRefresh(true);},retryDelay);
+    }
   });
+}
+
+// Phones suspend the websocket in the background, so pull fresh data on return.
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)hardRefresh(true);});
+
+async function hardRefresh(quiet){
+  setSyncStatus('loading','Syncing…');
+  try{
+    tasks=await fetchTasks();
+    render();
+    setSyncStatus('live','Live sync');
+    subscribeRealtime();
+    if(!quiet)toast('Up to date ✓');
+  }catch(e){console.error(e);setSyncStatus('error','Offline — changes will not save');}
 }
 
 async function init(){
@@ -598,11 +714,20 @@ async function init(){
     tasks=await fetchTasks();
     setSyncStatus('live','Live sync');
     subscribeRealtime();
-  }catch(e){setSyncStatus('error','Connection error');console.error(e);}
+  }catch(e){setSyncStatus('error','Offline — changes will not save');console.error(e);}
   const now=sgtToday();calYear=now.getFullYear();calMonth=now.getMonth();
+  renderCountdown();
   updateUserUI();
+  syncFilterUI();
   render();
 }
+
+let searchTimer=null;
+document.getElementById('search-input').addEventListener('input',e=>{
+  clearTimeout(searchTimer);
+  const v=e.target.value.trim().toLowerCase();
+  searchTimer=setTimeout(()=>{filterText=v;syncFilterUI();render();},180);
+});
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 async function addTask(){
@@ -615,9 +740,9 @@ async function addTask(){
   if(!text)return;
   if(!canEdit(lane,currentUser)){toast('You can\'t add to this lane');return;}
   const btn=document.getElementById('add-btn');btn.disabled=true;
-  const t={id:Date.now(),text,lane,due,done:false,effort,pic};
+  const t={id:Date.now(),text,lane,due:due||null,done:false,effort,pic};
   try{await upsertTask(t);tasks.push(t);document.getElementById('task-input').value='';toast('Task added ✓');render();}
-  catch(e){toast('Failed to save');}
+  catch(e){console.error(e);toast('Could not save — check the sync dot and try again');}
   btn.disabled=false;
 }
 document.getElementById('task-input').addEventListener('keydown',e=>{if(e.key==='Enter')addTask();});
@@ -632,9 +757,11 @@ async function toggleDone(id){
 async function deleteTask(id){
   const t=tasks.find(t=>t.id===id);if(!t)return;
   if(!canEdit(t.lane,currentUser)){toast('This lane is read-only for you');return;}
+  if(!confirm(`Delete “${t.text}”? This removes it for both of you.`))return;
+  const snapshot={...t};
   tasks=tasks.filter(t=>t.id!==id);render();
   try{await removeTask(id);toast('Deleted');}
-  catch(e){toast('Delete failed');}
+  catch(e){tasks.push(snapshot);render();toast('Could not delete — task restored');}
 }
 
 function switchView(v){
@@ -658,23 +785,73 @@ function picBadge(pic){
 function ownerBadge(lane){const o=LANE_OWNER[lane];return `<span class="owner-badge owner-${o==='tiff'?'tiff':o==='nic'?'nic':'both'}">${o==='tiff'?'Tiffany':o==='nic'?'Nic':'Both'}</span>`;}
 function wkHrs(wt){return wt.filter(t=>!t.done).reduce((s,t)=>s+effortHours[t.effort||'med'],0);}
 
+// Splits the week's remaining effort by who's actually doing it.
+// Shared tasks count half to each so the two totals still sum to the week's load.
+function effortSplit(wt){
+  let tiff=0,nic=0;
+  wt.filter(t=>!t.done).forEach(t=>{
+    const h=effortHours[t.effort||'med'],p=t.pic||'both';
+    if(p==='tiff')tiff+=h;else if(p==='nic')nic+=h;else{tiff+=h/2;nic+=h/2;}
+  });
+  const r=n=>Math.round(n*10)/10;
+  if(!tiff&&!nic)return '';
+  return `💍 <b>~${r(tiff)}h</b> · 👔 <b>~${r(nic)}h</b>`;
+}
+
+let overdueOpen=false;
+function toggleOverdue(){overdueOpen=!overdueOpen;renderWeek();}
+
+function addDays(ds,n){const d=pd(ds);d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+
+async function snooze(id){
+  const t=tasks.find(t=>t.id===id);if(!t||!t.due)return;
+  if(!canEdit(t.lane,currentUser)){toast('This lane is read-only for you');return;}
+  const prev=t.due;
+  // From today if already overdue, otherwise a week from its current date.
+  const base=isOverdue(t)?fmtISO(sgtToday()):t.due;
+  t.due=addDays(base,7);
+  render();
+  try{await upsertTask(t);toast(`Pushed to ${fmt(pd(t.due))}`);}
+  catch(e){t.due=prev;render();toast('Could not save the new date');}
+}
+
+async function pushAllOverdue(){
+  const ov=visibleTasks().filter(t=>isOverdue(t)&&canEdit(t.lane,currentUser));
+  if(!ov.length)return;
+  const wsp=getWeekStart(0),frip=new Date(wsp);frip.setDate(wsp.getDate()+4);
+  if(frip<sgtToday())frip.setDate(frip.getDate()+7);
+  if(!confirm(`Move ${ov.length} overdue task${ov.length>1?'s':''} to ${fmt(frip)}?`))return;
+  const ws=getWeekStart(0),fri=new Date(ws);fri.setDate(ws.getDate()+4);
+  // On a weekend, this week's Friday is already gone — use next Friday instead.
+  if(fri<sgtToday())fri.setDate(fri.getDate()+7);
+  const target=fmtISO(fri);
+  for(const t of ov){t.due=target;}
+  render();
+  try{for(const t of ov)await upsertTask(t);toast(`${ov.length} tasks moved to ${fmt(fri)}`);}
+  catch(e){toast('Some tasks did not save — press ⟳ to reload');}
+}
+
+function goToday(){weekOffset=0;renderWeek();renderLaneProgress();}
+
+function renderCountdown(){
+  const today=sgtToday();
+  document.getElementById('countdown').innerHTML=KEY_DATES.map(k=>{
+    const d=pd(k.date);if(!d)return '';
+    const days=Math.round((d-today)/86400000);
+    if(days<0)return '';
+    const wks=Math.floor(days/7);
+    return `<span class="cd-chip ${k.cls}"><b>${days}</b> days to ${k.label}${wks>1?` · ${wks} weeks`:''}</span>`;
+  }).join('');
+}
+
 function visibleLanes(){
-  if(currentUser==='tiff') return ['work','masters','wedding','reno'];
-  if(currentUser==='nic') return ['nic','wedding','reno'];
-  return ALL_LANES;
+  // Everyone sees every lane; canEdit() decides who can change what.
+  if(currentUser==='nic') return ['wedding','reno','nic','work','masters'];
+  return ['wedding','reno','work','masters','nic'];
 }
 function visibleTasks(){
   const lanes=visibleLanes();
-  return tasks.filter(t=>{
-    if(!lanes.includes(t.lane)) return false;
-    // For shared lanes (wedding, reno), also filter by PIC
-    // 'both' tasks always show to everyone
-    // 'tiff' tasks hidden from Nic, 'nic' tasks hidden from Tiff
-    const pic=t.pic||'both';
-    if(currentUser==='tiff' && pic==='nic') return false;
-    if(currentUser==='nic' && pic==='tiff') return false;
-    return true;
-  });
+  return tasks.filter(t=>lanes.includes(t.lane)&&matchesFilter(t));
 }
 
 function taskCard(t,showLane){
@@ -684,7 +861,7 @@ function taskCard(t,showLane){
   return `<div class="task-card ${t.lane} ${t.done?'done':''} ${ro?'readonly-card':''}">
     <div class="task-check ${t.done?'checked':''} ${ro?'disabled-check':''}" onclick="${ro?'toast(\'Read-only\')':'toggleDone('+t.id+')'}"></div>
     <div class="task-body">
-      <div class="task-text">${t.text}</div>
+      <div class="task-text">${esc(t.text)}</div>
       <div class="task-meta">
         ${showLane?`<span class="task-lane-tag tag-${t.lane}">${LANE_LABELS[t.lane]}</span>`:''}
         <span class="task-date ${ov&&!t.done?'task-overdue':''}">${ds}</span>
@@ -692,6 +869,7 @@ function taskCard(t,showLane){
         ${picBadge(t.pic)}
       </div>
     </div>
+    <button class="task-snooze ${ro||t.done?'hidden':''}" onclick="snooze(${t.id})" title="Push back one week">⏭</button>
     <button class="task-edit ${ro?'hidden':''}" onclick="openEditModal(${t.id})" title="Edit">✎</button>
     <button class="task-del ${ro?'hidden':''}" onclick="deleteTask(${t.id})" title="Delete">✕</button>
   </div>`;
@@ -700,8 +878,8 @@ function taskCard(t,showLane){
 function renderLaneProgress(){
   const ws=getWeekStart(weekOffset),we=new Date(ws);we.setDate(ws.getDate()+6);
   document.getElementById('lane-progress').innerHTML=visibleLanes().map(l=>{
-    const wO=tasks.filter(t=>t.lane===l&&!t.done&&pd(t.due)>=ws&&pd(t.due)<=we);
-    const wD=tasks.filter(t=>t.lane===l&&t.done&&pd(t.due)>=ws&&pd(t.due)<=we);
+    const inWeek=visibleTasks().filter(t=>t.lane===l&&pd(t.due)>=ws&&pd(t.due)<=we);
+    const wO=inWeek.filter(t=>!t.done),wD=inWeek.filter(t=>t.done);
     const wT=wO.length+wD.length;
     const pct=wT?Math.round(wD.length/wT*100):100;
     const hrs=wkHrs(wO);
@@ -720,10 +898,24 @@ function renderWeek(){
   const ws=getWeekStart(weekOffset),we=new Date(ws);we.setDate(ws.getDate()+6);
   const yr=we.getFullYear()>2026;
   document.getElementById('week-label').textContent=`${fmt(ws)} – ${fmt(we,yr)}`;
+  document.getElementById('today-btn').style.display=weekOffset===0?'none':'';
   const wt=visibleTasks().filter(t=>{const d=pd(t.due);return d&&d>=ws&&d<=we;});
-  document.getElementById('week-effort-label').textContent=wkHrs(wt)>0?`~${wkHrs(wt)}h total effort`:'';
-  const ov=visibleTasks().filter(t=>isOverdue(t));
-  document.getElementById('overdue-banner').innerHTML=ov.length&&weekOffset===0?`<div class="overdue-banner">⚠ ${ov.length} overdue task${ov.length>1?'s':''} — check previous weeks</div>`:'';
+  document.getElementById('week-effort-label').innerHTML=effortSplit(wt);
+
+  // Overdue — shown in place, not hidden behind "check previous weeks"
+  const ov=visibleTasks().filter(t=>isOverdue(t)).sort((a,b)=>pd(a.due)-pd(b.due));
+  if(ov.length&&weekOffset===0){
+    const mine=ov.filter(t=>canEdit(t.lane,currentUser));
+    document.getElementById('overdue-banner').innerHTML=`<div class="overdue-panel">
+      <div class="od-head" onclick="toggleOverdue()">
+        <span class="od-caret">${overdueOpen?'▾':'▸'}</span>
+        <span class="od-title">${ov.length} overdue</span>
+        <span class="od-hrs">~${wkHrs(ov)}h backlog · oldest ${fmt(pd(ov[0].due),pd(ov[0].due).getFullYear()>2026)}</span>
+      </div>
+      ${overdueOpen?`<div class="od-body">${ov.map(t=>taskCard(t,true)).join('')}</div>
+      ${mine.length?`<button class="od-bulk" onclick="pushAllOverdue()">Push my ${mine.length} overdue to this week</button>`:''}`:''}
+    </div>`;
+  } else document.getElementById('overdue-banner').innerHTML='';
   document.getElementById('week-summary').innerHTML=visibleLanes().map(l=>{
     const c=wt.filter(t=>t.lane===l&&!t.done).length;
     return c>0?`<span class="lane-pill pill-${l}">${LANE_LABELS[l]} · ${c}</span>`:'';
@@ -732,12 +924,12 @@ function renderWeek(){
   const pend=sorted.filter(t=>!t.done),done=sorted.filter(t=>t.done);
   let html=pend.map(t=>taskCard(t,true)).join('');
   if(done.length)html+=`<div class="section-label">Done</div>`+done.map(t=>taskCard(t,true)).join('');
-  document.getElementById('week-tasks').innerHTML=html||`<div class="empty-state">Nothing due this week 🎉</div>`;
+  document.getElementById('week-tasks').innerHTML=html||`<div class="empty-state">${anyFilter()?'No tasks match these filters this week.':'Nothing due this week 🎉'}</div>`;
 }
 
 function renderLane(){
   document.getElementById('lane-columns').innerHTML=visibleLanes().map(l=>{
-    const lt=tasks.filter(t=>t.lane===l);
+    const lt=visibleTasks().filter(t=>t.lane===l);
     const pend=lt.filter(t=>!t.done).sort((a,b)=>{const da=pd(a.due),db=pd(b.due);if(!da&&!db)return 0;if(!da)return 1;if(!db)return-1;return da-db;});
     const done=lt.filter(t=>t.done);
     const ro=currentUser&&!canEdit(l,currentUser);
@@ -771,7 +963,7 @@ function renderCal(){
     const dlabel=new Date(calYear,calMonth,day).toLocaleDateString('en-SG',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
     html+=`<div class="cal-day${isToday?' today':''}" onclick="openModal('${ds}','${dlabel}')">
       <div class="cal-day-num">${day}</div>
-      ${shown.map(t=>`<div class="cal-dot dot-${t.lane} ${t.done?'dot-done':''}">${t.text}</div>`).join('')}
+      ${shown.map(t=>`<div class="cal-dot dot-${t.lane} ${t.done?'dot-done':''}" title="${esc(t.text)}">${esc(t.text)}</div>`).join('')}
       ${extra>0?`<div class="cal-more">+${extra} more</div>`:''}
     </div>`;
   }
@@ -820,7 +1012,7 @@ async function saveEdit(){
   if(!canEdit(newLane,currentUser)){toast('Cannot move to a lane you don\'t own');return;}
   t.text=document.getElementById('edit-text').value.trim()||t.text;
   t.lane=newLane;
-  t.due=document.getElementById('edit-due').value;
+  t.due=document.getElementById('edit-due').value||null;
   t.effort=document.getElementById('edit-effort').value;
   t.pic=document.getElementById('edit-pic').value;
   closeEditModalDirect();
