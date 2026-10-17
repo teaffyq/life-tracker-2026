@@ -35,6 +35,23 @@ header p{font-size:11px;color:var(--muted);letter-spacing:.05em;text-transform:u
 .sync-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
 .sgt-badge{font-size:9px;background:var(--masters-bg);color:var(--masters);border:1px solid var(--masters-bd);border-radius:10px;padding:2px 8px;}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.who-btn.static{cursor:default;}
+.signout-btn{font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.05em;background:none;border:none;color:var(--muted);cursor:pointer;text-decoration:underline;padding:0 4px;}
+
+/* AUTH GATE */
+body.signed-out > *:not(#auth-gate):not(#toast):not(script){display:none!important;}
+#auth-gate{display:none;}
+body.signed-out #auth-gate{display:flex;}
+#auth-gate{min-height:calc(100vh - 3rem);align-items:center;justify-content:center;}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem 1.5rem;width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px;}
+.auth-card h1{margin-bottom:0;}
+.auth-card p{font-size:11px;color:var(--muted);line-height:1.6;}
+.auth-card input[type=email]{font-family:'DM Mono',monospace;font-size:13px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:9px 10px;color:var(--text);outline:none;width:100%;}
+.auth-card input[type=email]:focus{border-color:var(--text);}
+.auth-card .add-btn{height:38px;}
+.auth-msg{font-size:11px;line-height:1.6;min-height:1.6em;}
+.auth-msg.ok{color:var(--green);}
+.auth-msg.err{color:var(--work);}
 
 /* READONLY BANNER */
 .readonly-banner{background:var(--reno-bg);border:1px solid var(--reno-bd);border-radius:8px;padding:8px 14px;font-size:11px;color:var(--reno);margin-bottom:1rem;display:none;}
@@ -249,7 +266,18 @@ input:focus,select:focus{border-color:var(--text);}
 }
 </style>
 </head>
-<body>
+<body class="signed-out">
+<!-- SIGN IN -->
+<div id="auth-gate">
+  <form class="auth-card" id="auth-form">
+    <h1>Life Tracker</h1>
+    <p>Enter your email and we'll send you a sign-in link. Open it on this device.</p>
+    <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" required aria-label="Email"/>
+    <button class="add-btn" type="submit" id="auth-btn">Send magic link</button>
+    <div class="auth-msg" id="auth-msg" role="status"></div>
+  </form>
+</div>
+
 <header>
   <h1>Tiffany & Nic's Life Tracker</h1>
   <p>Jun 2026 — Jan 2027 · Wedding · Renovation · Work · Masters · Nic</p>
@@ -257,9 +285,9 @@ input:focus,select:focus{border-color:var(--text);}
 
 <!-- WHO AM I -->
 <div class="who-bar">
-  <span class="who-label">I am:</span>
-  <button class="who-btn" id="btn-tiff" onclick="setUser('tiff')">💍 Tiffany</button>
-  <button class="who-btn" id="btn-nic" onclick="setUser('nic')">👔 Nic</button>
+  <span class="who-label">Signed in as:</span>
+  <span class="who-btn static" id="who-name"></span>
+  <button class="signout-btn" onclick="signOut()">Sign out</button>
   <div class="sync-dot loading" id="sync-dot"></div>
   <span class="sync-label" id="sync-label">Connecting…</span>
   <button class="refresh-btn" onclick="hardRefresh()" title="Reload from server" aria-label="Reload from server">⟳</button>
@@ -453,19 +481,14 @@ function canEdit(lane,user){
 }
 
 // ── User state ────────────────────────────────────────────────────────────────
-let currentUser=localStorage.getItem('tracker_user')||null; // 'tiff' or 'nic'
-
-function setUser(u){
-  currentUser=u;
-  localStorage.setItem('tracker_user',u);
-  updateUserUI();
-  render();
-}
+// Set from the signed-in account's row in the members table: 'tiff' or 'nic'
+let currentUser=null;
 
 function updateUserUI(){
   const u=currentUser;
-  document.getElementById('btn-tiff').className='who-btn'+(u==='tiff'?' active-tiff':'');
-  document.getElementById('btn-nic').className='who-btn'+(u==='nic'?' active-nic':'');
+  const who=document.getElementById('who-name');
+  who.className='who-btn static'+(u==='tiff'?' active-tiff':u==='nic'?' active-nic':'');
+  who.textContent=u==='tiff'?'💍 Tiffany':u==='nic'?'👔 Nic':'';
 
   // Update add form lane options based on who can add
   const sel=document.getElementById('lane-select');
@@ -678,12 +701,16 @@ let rtChannel=null,retryTimer=null,retryDelay=2000;
 
 function subscribeRealtime(){
   if(rtChannel){db.removeChannel(rtChannel);rtChannel=null;}
-  rtChannel=db.channel('tasks-rt').on('postgres_changes',{event:'*',schema:'public',table:'tasks'},payload=>{
+  const ch=db.channel('tasks-rt').on('postgres_changes',{event:'*',schema:'public',table:'tasks'},payload=>{
     const{eventType,new:n,old:o}=payload;
     if(eventType==='INSERT'||eventType==='UPDATE'){const idx=tasks.findIndex(t=>t.id===n.id);if(idx>=0)tasks[idx]=n;else tasks.push(n);}
     else if(eventType==='DELETE')tasks=tasks.filter(t=>t.id!==o.id);
     render();
-  }).subscribe(s=>{
+  });
+  rtChannel=ch;
+  ch.subscribe(s=>{
+    // ignore status from a channel we've already replaced or removed (e.g. on sign-out)
+    if(ch!==rtChannel||!currentUser)return;
     if(s==='SUBSCRIBED'){setSyncStatus('live','Live sync');retryDelay=2000;}
     else if(s==='CHANNEL_ERROR'||s==='TIMED_OUT'||s==='CLOSED'){
       setSyncStatus('error','Reconnecting…');
@@ -694,7 +721,7 @@ function subscribeRealtime(){
 }
 
 // Phones suspend the websocket in the background, so pull fresh data on return.
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)hardRefresh(true);});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&currentUser)hardRefresh(true);});
 
 async function hardRefresh(quiet){
   setSyncStatus('loading','Syncing…');
@@ -705,6 +732,64 @@ async function hardRefresh(quiet){
     subscribeRealtime();
     if(!quiet)toast('Up to date ✓');
   }catch(e){console.error(e);setSyncStatus('error','Offline — changes will not save');}
+}
+
+// ── Auth (Supabase magic link) ────────────────────────────────────────────────
+let appStarted=false;
+
+function authMsg(text,kind){const m=document.getElementById('auth-msg');m.textContent=text;m.className='auth-msg'+(kind?' '+kind:'');}
+
+document.getElementById('auth-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const email=document.getElementById('auth-email').value.trim().toLowerCase();
+  if(!email)return;
+  const btn=document.getElementById('auth-btn');
+  btn.disabled=true;authMsg('Sending…');
+  const{error}=await db.auth.signInWithOtp({
+    email,
+    // shouldCreateUser:false → only accounts you've added in Supabase can sign in
+    options:{emailRedirectTo:location.origin+location.pathname,shouldCreateUser:false}
+  });
+  btn.disabled=false;
+  if(error){console.error(error);authMsg(/signups not allowed|not found/i.test(error.message)?'That email isn\'t set up for this tracker.':error.message,'err');}
+  else authMsg('Check your inbox for the sign-in link.','ok');
+});
+
+async function signOut(){
+  await db.auth.signOut();
+}
+
+async function lookupRole(email){
+  const{data,error}=await db.from('members').select('role').eq('email',email).maybeSingle();
+  if(error)throw error;
+  return data?data.role:null;
+}
+
+async function onSignedIn(session){
+  if(appStarted)return;
+  const email=(session.user.email||'').toLowerCase();
+  let role=null;
+  try{role=await lookupRole(email);}catch(e){console.error(e);}
+  if(role!=='tiff'&&role!=='nic'){
+    await db.auth.signOut();
+    authMsg('Signed in, but this email isn\'t on the members list.','err');
+    return;
+  }
+  appStarted=true;
+  currentUser=role;
+  document.body.classList.remove('signed-out');
+  // tidy the #access_token=… fragment out of the address bar
+  if(location.hash.includes('access_token'))history.replaceState(null,'',location.pathname+location.search);
+  await init();
+}
+
+function onSignedOut(){
+  appStarted=false;
+  currentUser=null;
+  tasks=[];
+  clearTimeout(retryTimer);
+  if(rtChannel){db.removeChannel(rtChannel);rtChannel=null;}
+  document.body.classList.add('signed-out');
 }
 
 async function init(){
@@ -722,6 +807,17 @@ async function init(){
   render();
 }
 
+function startAuth(){
+  // Fires INITIAL_SESSION on load (existing or just-returned-from-link session), then SIGNED_IN / SIGNED_OUT.
+  // Deferred with setTimeout: awaiting Supabase calls inside this callback can deadlock the client.
+  db.auth.onAuthStateChange((event,session)=>{
+    setTimeout(()=>{
+      if(session)onSignedIn(session);
+      else onSignedOut();
+    },0);
+  });
+}
+
 let searchTimer=null;
 document.getElementById('search-input').addEventListener('input',e=>{
   clearTimeout(searchTimer);
@@ -731,7 +827,7 @@ document.getElementById('search-input').addEventListener('input',e=>{
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 async function addTask(){
-  if(!currentUser){toast('Select Tiffany or Nic first');return;}
+  if(!currentUser){toast('Sign in first');return;}
   const text=document.getElementById('task-input').value.trim();
   const lane=document.getElementById('lane-select').value;
   const due=document.getElementById('date-input').value;
@@ -1033,7 +1129,7 @@ function render(){
 
 const _t=sgtToday();
 document.getElementById('date-input').value=`${_t.getFullYear()}-${String(_t.getMonth()+1).padStart(2,'0')}-${String(_t.getDate()).padStart(2,'0')}`;
-init();
+startAuth();
 </script>
 </body>
 </html>
